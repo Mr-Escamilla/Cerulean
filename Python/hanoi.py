@@ -1,7 +1,6 @@
 '''
 Credits to whatever website I took this from
 '''
-
 def hanoi(n, f, to, via):
     if n == 1:
         print("Move disk 1 from",f,"to",to)
@@ -11,7 +10,7 @@ def hanoi(n, f, to, via):
         hanoi(n-1, via, to, f)
 
 
-n = 3
+n = 5
 f = 'A'
 to = 'B'
 via = 'C'

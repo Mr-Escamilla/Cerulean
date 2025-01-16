@@ -36,4 +36,4 @@ def log_10(x):
     return D*sum+n
 
 
-print(log_10(99))
+print(log_10(10))
