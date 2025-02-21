@@ -2,6 +2,76 @@
 from colorama import init
 from termcolor import colored
 
+
+class Node():
+  def __init__(self, row, column, player):
+    self.coords = {"row":row, "column":column}
+    self.player_num = player
+    self.horizontal_length = 1
+    self.vertical_length = 1
+    self.diagonal_R_length = 1
+    self.diagonal_L_length = 1
+
+  def is_winner(self):
+    return self.horizontal_length >= 4 or self.vertical_length >= 4 \
+      or self.diagonal_L_length >= 4 or self.diagonal_R_length >= 4
+  
+  def vertical_update(self, game_board):
+    row_num = self.coords["row"]
+    col_num = self.coords["column"]
+
+    if row_num >= 0 and row_num < 5: # If lower neighbor is a Node and is from the same player
+      if type(game_board.cells[row_num + 1][col_num]) is Node and game_board.cells[row_num + 1][col_num].player_num == self.player_num:
+        self.vertical_length = game_board.cells[row_num + 1][col_num].vertical_length + 1 # This vert_chain length = previous length + 1
+    # No need to check for row == 5. If you drop a token and it's on the bottom row, it cannot have a neighbor above it
+
+  def horizontal_update(self, game_board):
+    row_num = self.coords["row"]
+    col_num = self.coords["column"]
+
+    if col_num > 0 and col_num < 6:  # If dropped in the middle, check for nodes left & right for a friendly node
+      right_neighbor_length = 0
+      left_neighbor_length = 0
+
+      if type(game_board.cells[row_num][col_num - 1]) is Node and game_board.cells[row_num][col_num - 1].player_num == self.player_num: # Check left
+        left_neighbor_length = game_board.cells[row_num][col_num - 1].horizontal_length + 1 # This horz_chain length = previous length + 1
+      if type(game_board.cells[row_num][col_num + 1]) is Node and game_board.cells[row_num][col_num + 1].player_num == self.player_num: # Check right
+        right_neighbor_length = game_board.cells[row_num][col_num + 1].horizontal_length + 1 # This horz_chain length = previous length + 1
+      
+      if right_neighbor_length and left_neighbor_length: # If there are chains to the nodes left and right
+        self.horizontal_length = left_neighbor_length + right_neighbor_length + 1 # Add this node and add their lengths together 
+      else: # Else i'm missing a partner on 1 side or missing on both sides
+        self.horizontal_length = max(left_neighbor_length, right_neighbor_length, self.horizontal_length) #Pick the biggest between myself (1) or the other chain
+
+    elif col_num == 0:  # If on the left wall, and right neighbor is a Node and is from the same player
+      if type(game_board.cells[row_num][col_num + 1]) is Node and game_board.cells[row_num][col_num + 1].player_num == self.player_num:
+        self.horizontal_length = game_board.cells[row_num][col_num + 1].horizontal_length + 1 # This horz_chain length = previous length + 1
+    elif col_num == 6:  # If on the right wall, and left neighbor is a Node and is from the same player
+      if type(game_board.cells[row_num][col_num - 1]) is Node and game_board.cells[row_num][col_num - 1].player_num == self.player_num:
+        self.horizontal_length = game_board.cells[row_num][col_num - 1].horizontal_length + 1 # This horz_chain length = previous length + 1
+  
+  # new diag sketch
+  # Diag_Right:
+  #        o     
+  #     x      
+  #  o       
+  #         
+  # Diag_Left:              
+  #  o         
+  #     x        
+  #        o      
+  #             
+
+
+  def update_from_neighbors(self, gameboard):
+    self.vertical_update(gameboard)
+    self.horizontal_update(gameboard)
+    self.diag_left_update(gameboard)
+    self.diag_right_update(gameboard)
+    pass
+    
+  
+
 # 7 cols 6 rows
 class Game_Board():
   def __init__(self):
@@ -15,7 +85,7 @@ class Game_Board():
     for _ in range(rows):
       self.cells.append([0]*columns)
   
-  def is_game_over(self):
+  def is_game_over(self): # TODO is_game_over(self, node) return node.is_winner()
     return self.game_over
   
   def is_column_full(self, column_number):  # Returns true if all values are truthy (if column values are all != 0)
@@ -23,9 +93,11 @@ class Game_Board():
   
   def drop_token(self, player_num, column_index):
     column = [row[column_index] for row in self.cells]
-    for row, cell in enumerate(column):
-      if cell == 0:
-        self.cells[row][column_index] = player_num  # change to player num
+    for row_index, cell in enumerate(column):
+      if cell == 0: # If the cell is empty
+        new_node = Node(row_index, column_index, player_num)  # change to player num
+        new_node.update_from_neighbors(self)
+        self.cells[row_index][column_index] = new_node
         break
     
 
@@ -33,19 +105,20 @@ class Game_Board():
 def print_board(game_board):
   row = 7
   while row > 0:
-    output = ""
-    col = 6
-    while col > -1:
-      if row == 7:
+    output = "" # Reset row string
+    col = 6 # reset column counter
+    while col > -1: # Decrement while
+      if row == 7:  # First row is display row for player choice
         output += f"|   {col + 1}   "
-      elif game_board.cells[row-1][col] == 1:
-        output += ("|   " + colored("X", 'red') + "   ")
-      elif game_board.cells[row-1][col] == 2:
-        output += ("|   " + colored("O", 'green') + "   ")
-      else:
-        output += f"| ***** "
+      elif type(game_board.cells[row-1][col]) is Node:  # If the space is occupied by a Node
+        if game_board.cells[row-1][col].player_num == 1:  # Print for player 1
+          output += ("|   " + colored("X", 'red') + "   ")
+        elif game_board.cells[row-1][col].player_num == 2: # Print for player 2
+          output += ("|   " + colored("O", 'green') + "   ")
+      else: # If the space is NOT occupied by a Node
+        output += f"| ***** "   # Print blank space
 
-      col -= 1
+      col -= 1  # Decrement column counter
     print(output + "|\n")
     row -= 1
 
